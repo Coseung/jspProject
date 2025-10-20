@@ -13,9 +13,10 @@ import com.kh.jsp.model.dao.BoardDao;
 import com.kh.jsp.model.vo.Attachment;
 import com.kh.jsp.model.vo.Board;
 import com.kh.jsp.model.vo.Category;
+import com.kh.jsp.model.vo.Reply;
 
 public class BoardService {
-
+	
 	public int selectAllBoardCount(){
 		Connection conn = getConnection();
 		
@@ -32,6 +33,29 @@ public class BoardService {
 		close(conn);
 		
 		return list;
+	}
+	
+	public ArrayList<Board> selectThumnailList(){
+		Connection conn = getConnection();
+		
+		ArrayList<Board> list = new BoardDao().selectThumnailList(conn);
+		close(conn);
+		
+		return list;
+	}
+	
+	public int deleteReply(int replyNo){
+		Connection conn = getConnection();
+		
+		int result = new BoardDao().deleteReply(conn, replyNo);
+		if(result > 0) {
+			commit(conn);
+		} else {
+			rollback(conn);
+		}
+		
+		close(conn);
+		return result;
 	}
 	
 	public int increaseCount(int boardNo) {
@@ -56,6 +80,24 @@ public class BoardService {
 		close(conn);
 		return board;
 	}
+
+	public int insertThumbnailBoard(Board b, ArrayList<Attachment> list) {
+		Connection conn = getConnection();
+
+		BoardDao bDao = new BoardDao();
+		int result1 = bDao.insertThumbnailBoard(conn, b);
+		int result2 = bDao.insertAttachmentList(conn, list);
+
+		if (result1 > 0 && result2 > 0) {
+			commit(conn);
+		} else {
+			rollback(conn);
+		}
+
+		close(conn);
+
+		return result1 * result2;
+	}
 	
 	public Attachment selectAttachment(int boardNo) {
 		Connection conn = getConnection();
@@ -75,15 +117,23 @@ public class BoardService {
 		return categroyList;
 	}
 	
-	public int updateBoard(int boardNo,int categoryNo,String boardTitle,String boardContent) {
+	public int updateBoard(Board b, Attachment at) {
+		//새로운 첨부파일이 존재하지 않을 때  -> (b, null) -> board update
+		//새로운 첨부파일이 존재하고 기존첨부파일이 존재할 때 -> (b, at(fileNo)) -> board update, attachment update
+		//새로운 첨부파일이 존재하고 기존첨부파일이 존재하지 않을 때 -> (b, at(refBoardNo)) -> board update, attachment insert
+	
 		Connection conn = getConnection();
-		Board b = new Board();
-		b.setBoardNo(boardNo);
-		b.setCategoryNo(categoryNo);
-		b.setBoardTitle(boardTitle);
-		b.setBoardContent(boardContent);
+		BoardDao boardDao = new BoardDao();
 		
-		int result = new BoardDao().updateBoard(conn, b);
+		int result = boardDao.updateBoard(conn, b);
+		
+		if(at != null) {
+			if(at.getFileNo() != 0) { //기존첨부파일이 존재할 때
+				result *= boardDao.updateAttachment(conn, at);
+			} else { //기존첨부파일이 존재하지 않을 때
+				result *= boardDao.insertNewAttachment(conn, at);
+			}
+		}
 		
 		if(result > 0) {
 			commit(conn);
@@ -115,5 +165,30 @@ public class BoardService {
 		close(conn);
 		return result;
 	}
+	
+	public int insertReply(Reply r) {
+		Connection conn = getConnection();
+		
+		int result = new BoardDao().insertReply(conn, r);
+		
+		if(result > 0) {
+			commit(conn);
+		} else {
+			rollback(conn);
+		}
+		
+		close(conn);
+		return result;
+	}
+	
+	public ArrayList<Reply> selectReplyByBoardNo(int boardNo){
+		Connection conn = getConnection();
+		
+		ArrayList<Reply> list = new BoardDao().selectReplyByBoardNo(conn, boardNo);
+		
+		close(conn);
+		return list;
+	}
+	
 
 }
